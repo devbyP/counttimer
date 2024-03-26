@@ -3,3 +3,6 @@ run5:
 
 build:
 	go build -o ./dist/timer .
+
+install: build
+	cp ./dist/timer ~/.local/bin

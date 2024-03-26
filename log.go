@@ -15,13 +15,15 @@ var (
 
 type TimeLog struct {
 	StartTime   time.Time
-	EndTime     *time.Time
+	EndTime     time.Time
 	Program     string
+	Title       string
+	Description string
 	EarlyFinish bool
 }
 
 func (tl TimeLog) writeFormat() string {
-	return "test"
+	return "test v2\n"
 }
 
 func saveLog(tl TimeLog) error {

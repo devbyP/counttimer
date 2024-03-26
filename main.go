@@ -11,35 +11,44 @@ import (
 	"time"
 )
 
-var (
-	c   bool
-	pre string
-	m   int
-	s   int
-)
+type FlagsConf struct {
+	IsCustom    bool
+	Program     Program
+	Title       string
+	Description string
+	Minute      int
+	Second      int
+	Notify      bool
+}
 
-func init() {
-	flag.BoolVar(&c, "c", false, "custom mode")
-	flag.StringVar(&pre, "p", Default, "preset program")
-	flag.IntVar(&m, "m", 0, "stop time in minute (custom program)")
-	flag.IntVar(&s, "s", 0, "stop time in second (custom program)")
-	// d := flag.String("d", "", "count session description for notification")
-	// n := flag.Bool("n", true, "notify service")
+func handleFlags(f *FlagsConf) {
+	var pro string
+	flag.BoolVar(&f.IsCustom, "c", false, "custom mode")
+	flag.StringVar(&pro, "p", Default, "preset program")
+	flag.IntVar(&f.Minute, "m", 0, "stop time in minute (custom program)")
+	flag.IntVar(&f.Second, "s", 0, "stop time in second (custom program)")
+	flag.StringVar(&f.Title, "t", "test default", "title message")
+	flag.StringVar(&f.Description, "d", "", "count session description for notification")
+	flag.BoolVar(&f.Notify, "n", true, "notify service after time over")
 	customUsage()
 	flag.Parse()
+	f.Program = Program(pro)
 }
 
 func main() {
+	f := &FlagsConf{}
+	handleFlags(f)
 	err := initBase()
 	if err != nil {
 		printErrHelp(err)
 		return
 	}
-	err = validateFlag(pre, c, m, s)
+	err = f.validateFlag()
 	if err != nil {
 		printErrHelp(err)
 		return
 	}
+	f.Default()
 	conf, err := getConf()
 	if err != nil {
 		perr := &os.PathError{}
@@ -52,28 +61,27 @@ func main() {
 	if conf.NotifyMethod != "" {
 		fmt.Println("do notify")
 	}
-	if c {
-		pre = Custom
-	}
-	program := getProperProgramName(pre)
+	program := f.Program.getProperName()
 
-	countLimit, err := getCountBaseOnProgram(program, m, s)
+	countLimit, err := f.Program.getCount(f.Minute, f.Second)
 	if err != nil {
 		printErrHelp(err)
 		return
 	}
+	var startTime, endTime time.Time
 
 	printIntro(program, countLimit)
-	err = saveLog(TimeLog{})
-	if err != nil {
-		printErrHelp(err)
-		return
+	startTime = time.Now()
+	tl := TimeLog{
+		StartTime:   startTime,
+		Program:     program,
+		Title:       f.Title,
+		Description: f.Description,
 	}
 
-	startTime := time.Now()
-
+	early := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(done)
+	go gracefulShutdown(early)
 	dc := &DotCircle{
 		limit:   3,
 		current: 1,
@@ -86,18 +94,39 @@ func main() {
 	go dc.runDotGen(done, time.Millisecond*750)
 	go countTimer(done, countLimit, dc, startTime)
 
-	<-done
-	printEnding()
+	select {
+	case <-done:
+		endTime = time.Now()
+		tl.EndTime = endTime
+		// handle logic properly done.
+	case <-early:
+		endTime = time.Now()
+		tl.EndTime = endTime
+		tl.EarlyFinish = true
+		// handle logic early done.
+	}
+	err = saveLog(tl)
+	if err != nil {
+		printErrHelp(err)
+		return
+	}
+	printEnding(endTime)
 }
 
-func validateFlag(pre string, c bool, m, s int) error {
-	if pre != Default && c {
+func (f *FlagsConf) validateFlag() error {
+	if f.Program != Default && f.IsCustom {
 		return fmt.Errorf("cannot decided program")
 	}
-	if c && (m <= 0 && s <= 0) {
+	if f.IsCustom && (f.Minute <= 0 && f.Second <= 0) {
 		return fmt.Errorf("custom flag require -m and(or) -s flag")
 	}
 	return nil
+}
+
+func (f *FlagsConf) Default() {
+	if f.IsCustom {
+		f.Program = Custom
+	}
 }
 
 func customUsage() {
@@ -121,12 +150,11 @@ func customUsage() {
 	}
 }
 
-func gracefulShutdown(done chan struct{}) {
+func gracefulShutdown(early chan struct{}) {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	<-ctx.Done()
-	fmt.Println("\ngot interuption signal")
-	done <- struct{}{}
+	early <- struct{}{}
 }
 
 func printErrHelp(err error) {
@@ -145,10 +173,10 @@ func printIntro(program string, c int) {
 	fmt.Printf("counting time %02d minute %02d second\n", sm, ss)
 }
 
-func printEnding() {
+func printEnding(endTime time.Time) {
 	fmt.Println()
 	fmt.Println("done counting")
-	fmt.Println(timeFormat(time.Now()))
+	fmt.Println(timeFormat(endTime))
 }
 
 func timeFormat(t time.Time) string {

@@ -42,20 +42,6 @@ func countTimer(done chan struct{}, countLimit int, dc *DotCircle, start time.Ti
 	}
 }
 
-func getCountBaseOnProgram(p string, m, s int) (int, error) {
-	pt, ok := preset[p]
-	if p == Custom {
-		return handleCustom(m, s)
-	}
-	if !ok {
-		p = Default
-		pt = preset[p]
-	}
-	minute := pt[0]
-	second := pt[1]
-	return getCountFromMS(minute, second), nil
-}
-
 func getTimeFromCount(c int) (int, int) {
 	m := c / 60
 	s := c % 60

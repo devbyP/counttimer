@@ -2,6 +2,8 @@ package main
 
 import "fmt"
 
+type Program string
+
 const (
 	Default = "default"
 	Custom  = "custom"
@@ -28,15 +30,33 @@ var aliasPro = map[string]string{
 	"lb": "longbreak",
 }
 
-func getProperProgramName(p string) string {
-	_, ok := preset[p]
+func (p Program) getProperName() string {
+	name := string(p)
+	_, ok := preset[name]
 	if !ok {
 		return Default
 	}
-	return p
+	if a, ok := aliasPro[name]; ok {
+		return a
+	}
+	return name
 }
 
-func handleCustom(m, s int) (int, error) {
+func (p Program) getCount(m, s int) (int, error) {
+	pt, ok := preset[string(p)]
+	if string(p) == Custom {
+		return p.handleCustom(m, s)
+	}
+	if !ok {
+		p = Default
+		pt = preset[string(p)]
+	}
+	minute := pt[0]
+	second := pt[1]
+	return getCountFromMS(minute, second), nil
+}
+
+func (p Program) handleCustom(m, s int) (int, error) {
 	count := getCountFromMS(m, s)
 	if count == 0 {
 		return 0, fmt.Errorf("custom program require set time using m and(or) s flag, count == %d", count)
