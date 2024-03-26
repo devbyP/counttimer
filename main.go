@@ -27,7 +27,7 @@ func handleFlags(f *FlagsConf) {
 	flag.StringVar(&pro, "p", Default, "preset program")
 	flag.IntVar(&f.Minute, "m", 0, "stop time in minute (custom program)")
 	flag.IntVar(&f.Second, "s", 0, "stop time in second (custom program)")
-	flag.StringVar(&f.Title, "t", "test default", "title message")
+	flag.StringVar(&f.Title, "t", "", "title message")
 	flag.StringVar(&f.Description, "d", "", "count session description for notification")
 	flag.BoolVar(&f.Notify, "n", true, "notify service after time over")
 	customUsage()
