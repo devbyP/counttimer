@@ -27,8 +27,8 @@ func handleFlags(f *FlagsConf) {
 	flag.StringVar(&pro, "p", Default, "preset program")
 	flag.IntVar(&f.Minute, "m", 0, "stop time in minute (custom program)")
 	flag.IntVar(&f.Second, "s", 0, "stop time in second (custom program)")
-	flag.StringVar(&f.Title, "t", "", "title message")
-	flag.StringVar(&f.Description, "d", "", "count session description for notification")
+	flag.StringVar(&f.Title, "t", "no title", "title message")
+	flag.StringVar(&f.Description, "d", "no description", "count session description for notification")
 	flag.BoolVar(&f.Notify, "n", true, "notify service after time over")
 	customUsage()
 	flag.Parse()
@@ -72,11 +72,20 @@ func main() {
 
 	printIntro(program, countLimit)
 	startTime = time.Now()
+	sessId := genSessionID(startTime)
+	timeM, timeS := f.Program.getTime(f.Minute, f.Second)
 	tl := TimeLog{
+		SessionID:   sessId,
 		StartTime:   startTime,
 		Program:     program,
 		Title:       f.Title,
+		Minute:      timeM,
+		Second:      timeS,
 		Description: f.Description,
+	}
+	err = saveLog(tl, Start)
+	if err != nil {
+		panic(err)
 	}
 
 	early := make(chan struct{})
@@ -105,10 +114,9 @@ func main() {
 		tl.EarlyFinish = true
 		// handle logic early done.
 	}
-	err = saveLog(tl)
+	err = saveLog(tl, End)
 	if err != nil {
-		printErrHelp(err)
-		return
+		panic(err)
 	}
 	printEnding(endTime)
 }

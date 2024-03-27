@@ -42,6 +42,17 @@ func (p Program) getProperName() string {
 	return name
 }
 
+func (p Program) getTime(m, s int) (int, int) {
+	if string(p) == Custom {
+		return m, s
+	}
+	pt, ok := preset[string(p)]
+	if !ok {
+		pt = preset[Default]
+	}
+	return pt[0], pt[1]
+}
+
 func (p Program) getCount(m, s int) (int, error) {
 	pt, ok := preset[string(p)]
 	if string(p) == Custom {
